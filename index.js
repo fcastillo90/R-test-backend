@@ -2,7 +2,7 @@ const express = require("express");
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors({
@@ -27,13 +27,39 @@ app.post('/external-api', function(req, res){
     return;
   }
   //Get from redis
-  client.getAsync(`${lat}_${lon}`).then(function(response) {
+  client.getAsync(`${lat}_${lon}`).then((response) => {
     if(response){
       res.send({data: JSON.parse(response), error: false});
       return;
     }
     else {
-      request(`https://api.darksky.net/forecast/090a0b6cc056a114d6482411e288f319/${lat},${lon}`, function (error, response, body) {
+      request(`https://api.darksky.net/forecast/090a0b6cc056a114d6482411e288f319/${lat},${lon}`, (error, response, body) => {
+        client.set(`${lat}_${lon}`, body , 'EX', EXPIRATION_TIME);
+        res.send({data: JSON.parse(body), error: false});
+        return;
+      });
+    }
+  });
+});
+
+app.get('/external-api/:lat,:lon', (req, res) => {
+  bluebird.promisifyAll(redis);
+  client = redis.createClient(process.env.REDIS_URL);
+  let lat = req.params.lat;
+  let lon = req.params.lon;
+  if(!lat || !lon){
+    res.send({data: {}, error: true});
+    return;
+  }
+  
+  //Get from redis
+  client.getAsync(`${lat}_${lon}`).then((response) => {
+    if(response){
+      res.send({data: JSON.parse(response), error: false});
+      return;
+    }
+    else {
+      request(`https://api.darksky.net/forecast/090a0b6cc056a114d6482411e288f319/${lat},${lon}`, (error, response, body) => {
         client.set(`${lat}_${lon}`, body , 'EX', EXPIRATION_TIME);
         res.send({data: JSON.parse(body), error: false});
         return;
